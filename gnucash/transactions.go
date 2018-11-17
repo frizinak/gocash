@@ -2,6 +2,7 @@ package gnucash
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -75,6 +76,17 @@ func (ts Transactions) FilterSplits(
 
 func (ts Transactions) Simplified() FlatTransactions {
 	return ts.mapTransactions().flatten().flattxs()
+}
+
+func (ts Transactions) SortDatePosted() Transactions {
+	sort.SliceStable(
+		ts,
+		func(i, j int) bool {
+			return ts[i].DatePosted.Get().Before(ts[j].DatePosted.Get())
+		},
+	)
+
+	return ts
 }
 
 func (ts Transactions) lookup() TransactionsLookup {
