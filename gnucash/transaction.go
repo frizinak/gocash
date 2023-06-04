@@ -24,12 +24,12 @@ func (t *Transaction) String() string {
 	)
 }
 
-func (t *Transaction) validate(lookup *AccountsLookup) error {
+func (t *Transaction) validate(lookup *AccountsLookup, prices Prices) error {
 	if t.ID == "" {
 		return errors.New("Empty transaction id")
 	}
 
-	if err := t.Splits.validate(lookup); err != nil {
+	if err := t.Splits.validate(lookup, prices); err != nil {
 		return err
 	}
 

@@ -13,12 +13,16 @@ type Book struct {
 	Transactions       Transactions       `xml:"transaction"`
 	TransactionsLookup TransactionsLookup `xml:"-"`
 	Scheduled          Schedules          `xml:"schedxaction"`
+	Commodities        Commodities        `xml:"commodity"`
+	Prices             Prices             `xml:"pricedb>price"`
 }
 
 func (b *Book) String() string {
 	return fmt.Sprintf(
-		"BOOK\nID: %s\nAccounts:\n%s\nTransactions:\n%s\nScheduled:\n%s",
+		"BOOK\nID: %s\nCommodities:\n%s\nPrices:\n%s\nAccounts:\n%s\nTransactions:\n%s\nScheduled:\n%s",
 		b.ID,
+		b.Commodities.String(),
+		b.Prices.String(),
 		b.Accounts.RootString(),
 		b.Transactions.String(),
 		b.Scheduled.String(),
@@ -38,7 +42,7 @@ func (b *Book) validate() error {
 		return err
 	}
 
-	if err := b.Transactions.validate(b.AccountsLookup); err != nil {
+	if err := b.Transactions.validate(b.AccountsLookup, b.Prices); err != nil {
 		return err
 	}
 

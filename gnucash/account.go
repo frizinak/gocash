@@ -15,14 +15,16 @@ type Account struct {
 	Parent       *Account     `xml:"-"`
 	Children     Accounts     `xml:"-"`
 	Transactions Transactions `xml:"-"`
+	Commodity    CommodityRef `xml:"commodity"`
 }
 
 func (a *Account) String() string {
 	return fmt.Sprintf(
-		"%s\nID: %s\nType: %s\nDescription: %s\nChildren:\n%s\nTransactions:\n%s",
+		"%s\nID: %s\nType: %s\nCurrency: %s\nDescription: %s\nChildren:\n%s\nTransactions:\n%s",
 		a.FQN,
 		a.ID,
 		a.Type,
+		a.Commodity.ID,
 		a.Description,
 		a.Children,
 		a.Transactions,
@@ -64,6 +66,8 @@ func (a *Account) validate(lookup *AccountsLookup, txLookup TransactionsLookup) 
 		a.Type != AccountTypeAsset &&
 		a.Type != AccountTypeCash &&
 		a.Type != AccountTypeBank &&
+		a.Type != AccountTypeStock &&
+		a.Type != AccountTypeMutual &&
 		a.Type != AccountTypeCredit &&
 		a.Type != AccountTypeEquity &&
 		a.Type != AccountTypeExpense &&

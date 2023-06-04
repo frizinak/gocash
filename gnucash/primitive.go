@@ -13,6 +13,8 @@ const (
 	AccountTypeAsset                  = "ASSET"
 	AccountTypeCash                   = "CASH"
 	AccountTypeBank                   = "BANK"
+	AccountTypeStock                  = "STOCK"
+	AccountTypeMutual                 = "MUTUAL"
 	AccountTypeCredit                 = "CREDIT"
 	AccountTypeEquity                 = "EQUITY"
 	AccountTypeExpense                = "EXPENSE"

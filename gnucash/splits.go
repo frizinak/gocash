@@ -63,9 +63,9 @@ func (ss Splits) Sum() Value {
 	return v
 }
 
-func (ss Splits) validate(lookup *AccountsLookup) error {
+func (ss Splits) validate(lookup *AccountsLookup, prices Prices) error {
 	for _, s := range ss {
-		if err := s.validate(lookup); err != nil {
+		if err := s.validate(lookup, prices); err != nil {
 			return err
 		}
 	}

@@ -100,9 +100,9 @@ func (ts Transactions) lookup() TransactionsLookup {
 	return lookup
 }
 
-func (ts Transactions) validate(lookup *AccountsLookup) error {
+func (ts Transactions) validate(lookup *AccountsLookup, prices Prices) error {
 	for _, t := range ts {
-		if err := t.validate(lookup); err != nil {
+		if err := t.validate(lookup, prices); err != nil {
 			return err
 		}
 	}

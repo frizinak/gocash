@@ -30,12 +30,17 @@ func (s *Split) String() string {
 	)
 }
 
-func (s *Split) validate(lookup *AccountsLookup) error {
+func (s *Split) validate(lookup *AccountsLookup, prices Prices) error {
 	if s.ID == "" {
 		return errors.New("Empty split id")
 	}
 
 	s.Account, _ = lookup.ByGUID(s.AccountID)
+
+	if !s.Account.Commodity.IsCurrency() {
+		price := prices.LastFor(s.Account.Commodity.FQN())
+		s.Value = s.Quantity * price.Value
+	}
 
 	if s.ReconciledState != ReconciledStateNew &&
 		s.ReconciledState != ReconciledStateCleared &&
