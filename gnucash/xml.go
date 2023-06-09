@@ -1,8 +1,8 @@
 package gnucash
 
-import "io"
-
 import (
+	"io"
+
 	nxml "encoding/xml"
 )
 
@@ -25,6 +25,24 @@ func (x *XML) validate() error {
 func Read(r io.Reader) (*XML, error) {
 	dec := nxml.NewDecoder(r)
 	xml := &XML{}
+	if err := dec.Decode(xml); err != nil {
+		return nil, err
+	}
+
+	return xml, xml.validate()
+}
+
+type AccountsXML struct {
+	Accounts Accounts `xml:"account"`
+}
+
+func (a *AccountsXML) validate() error {
+	return a.Accounts.validate(a.Accounts.lookup(), make(Transactions, 0).lookup())
+}
+
+func ReadAccounts(r io.Reader) (*AccountsXML, error) {
+	dec := nxml.NewDecoder(r)
+	xml := &AccountsXML{}
 	if err := dec.Decode(xml); err != nil {
 		return nil, err
 	}

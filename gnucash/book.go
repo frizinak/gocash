@@ -15,6 +15,7 @@ type Book struct {
 	Scheduled          Schedules          `xml:"schedxaction"`
 	Commodities        Commodities        `xml:"commodity"`
 	Prices             Prices             `xml:"pricedb>price"`
+	Slots              Slots              `xml:"slots>slot"`
 }
 
 func (b *Book) String() string {

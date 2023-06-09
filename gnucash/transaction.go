@@ -8,6 +8,7 @@ import (
 
 type Transaction struct {
 	ID          GUID   `xml:"id"`
+	Num         string `xml:"num"`
 	DatePosted  Date   `xml:"date-posted>date"`
 	DateEntered Date   `xml:"date-entered>date"`
 	Description string `xml:"description"`

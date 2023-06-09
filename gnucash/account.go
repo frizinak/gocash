@@ -16,6 +16,7 @@ type Account struct {
 	Children     Accounts     `xml:"-"`
 	Transactions Transactions `xml:"-"`
 	Commodity    CommodityRef `xml:"commodity"`
+	Slots        Slots        `xml:"slots>slot"`
 }
 
 func (a *Account) String() string {
@@ -29,6 +30,15 @@ func (a *Account) String() string {
 		a.Children,
 		a.Transactions,
 	)
+}
+
+func (a *Account) Placeholder() bool {
+	for _, s := range a.Slots {
+		if s.Key == "placeholder" {
+			return s.RawValue.Value == "true"
+		}
+	}
+	return false
 }
 
 func (a *Account) fqn() string {

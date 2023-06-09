@@ -1,6 +1,8 @@
 package gnucash
 
-import "strings"
+import (
+	"strings"
+)
 
 type Accounts []*Account
 type AccountsLookup struct {
