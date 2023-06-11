@@ -84,6 +84,8 @@ func start(msg string) func() {
 	}
 }
 
+const dFormat = "2006-01-02"
+
 type Conf struct {
 	o  []ConfKey
 	kv map[ConfKey]string
@@ -97,6 +99,10 @@ const (
 	KDataFile                      = "datafile"
 	KSheetID                       = "google-sheet-id"
 	KServiceAccountCredentialsFile = "service-account-credentials"
+	KAlias                         = "account.alias."
+	KIgnore                        = "account.ignore"
+	KReport                        = "report.profit.account"
+	KReportIgnore                  = "report.profit.ignore"
 )
 
 var eg = map[ConfKey]string{
@@ -165,7 +171,7 @@ func readconf(conf string, req []ConfKey) (Conf, error) {
 	return _c, nil
 }
 
-func confprefix(conf string, prefix string) ([]string, map[string]string, error) {
+func confPrefix(conf string, prefix string) ([]string, map[string]string, error) {
 	c, err := readconf(conf, nil)
 	if err != nil {
 		return nil, nil, err
@@ -188,21 +194,13 @@ func confprefix(conf string, prefix string) ([]string, map[string]string, error)
 	return o, kv, nil
 }
 
-func aliases(conf string) ([]string, map[string]string, error) {
-	return confprefix(conf, "account.alias.")
-}
-
-func ignores(conf string) ([]string, map[string]struct{}, error) {
-	o, m, err := confprefix(conf, "account.ignore")
-	if err != nil {
-		return nil, nil, err
+func confPrefixArray(conf string, prefix string) ([]string, error) {
+	o, m, err := confPrefix(conf, prefix)
+	l := make([]string, 0, len(o))
+	for _, k := range o {
+		l = append(l, m[k])
 	}
-	l := make(map[string]struct{}, len(m))
-
-	for _, v := range m {
-		l[v] = struct{}{}
-	}
-	return o, l, nil
+	return l, err
 }
 
 func accountsWithAliases(accounts gnucash.Accounts, conf string) (
@@ -211,7 +209,8 @@ func accountsWithAliases(accounts gnucash.Accounts, conf string) (
 	placeholder map[string]struct{},
 	err error,
 ) {
-	o, as, e := aliases(conf)
+
+	o, as, e := confPrefix(conf, KAlias)
 	if e != nil {
 		err = e
 		return
@@ -304,6 +303,30 @@ func accountFuzzy(accounts gnucash.Accounts) ([]string, *fuzzy.Index) {
 	fuzz := fuzzy.NewIndex(2, accountNames)
 
 	return accountNames, fuzz
+}
+
+func sheetPad(vals [][]interface{}, innerSize int) [][]interface{} {
+	n := len(vals)
+	if n < cap(vals) {
+		vals = vals[:cap(vals)]
+	}
+	for i := range vals {
+		if len(vals[i]) < innerSize {
+			x := make([]interface{}, innerSize-len(vals[i]))
+			for j := range x {
+				x[j] = ""
+			}
+			vals[i] = append(vals[i], x...)
+		}
+	}
+	for i := n; i < len(vals); i++ {
+		vals[i] = make([]interface{}, innerSize)
+		for j := range vals[i] {
+			vals[i][j] = ""
+		}
+	}
+
+	return vals
 }
 
 func main() {
@@ -401,7 +424,7 @@ func main() {
 
 		// todo validation / completion
 		tx := &transaction{}
-		tx.date = time.Now().Format("2006-01-02")
+		tx.date = time.Now().Format(dFormat)
 		tx.amount, err = ask("Amount", float)
 		if err != nil {
 			return err
@@ -441,25 +464,29 @@ func main() {
 			h.Add("print an example config on stdout")
 		}
 	}).Handler(func(set *flags.Set, args []string) error {
-		fmt.Println("datafile                    = /home/user/Documents/db.gnucash")
-		fmt.Println("service-account-credentials = /home/user/Private/service-account-credentials.json")
-		fmt.Println("google-sheet-id             = iUilufHz6OrPHnWEEXFkhbxkuf6WAlaPh8sQvC8ejUO7")
+		fmt.Printf("%s                    = /home/user/Documents/db.gnucash\n", KDataFile)
+		fmt.Printf("%s = /home/user/Private/service-account-credentials.json\n", KServiceAccountCredentialsFile)
+		fmt.Printf("%s             = iUilufHz6OrPHnWEEXFkhbxkuf6WAlaPh8sQvC8ejUO7\n", KSheetID)
 		fmt.Println()
-		fmt.Println("account.alias.food      = expenses.groceries.food")
-		fmt.Println("account.alias.snacks    = expenses.groceries.snacks")
-		fmt.Println("account.alias.household = expenses.groceries.household")
-		fmt.Println("account.alias.dining    = expenses.dining")
+		fmt.Printf("%sfood      = expenses.groceries.food\n", KAlias)
+		fmt.Printf("%ssnacks    = expenses.groceries.snacks\n", KAlias)
+		fmt.Printf("%shousehold = expenses.groceries.household\n", KAlias)
+		fmt.Printf("%sdining    = expenses.dining\n", KAlias)
 		fmt.Println()
-		fmt.Println("account.alias.me.bank      = assets.current.Some Bank.Me.checking")
-		fmt.Println("account.alias.partner.bank = assets.current.Some Bank.Partner.checking")
+		fmt.Printf("%sme.bank      = assets.current.some bank.me.checking\n", KAlias)
+		fmt.Printf("%spartner.bank = assets.current.some bank.partner.checking\n", KAlias)
 		fmt.Println()
-		fmt.Println("account.alias.me.wallet       = assets.current.wallets.me")
-		fmt.Println("account.alias.partner.wallet  = assets.current.wallets.partner")
+		fmt.Printf("%sme.wallet       = assets.current.wallets.me\n", KAlias)
+		fmt.Printf("%spartner.wallet  = assets.current.wallets.partner\n", KAlias)
 		fmt.Println()
-		fmt.Println("account.ignore[] = Root Account")
-		fmt.Println("account.ignore[] = Opening Balances")
-		fmt.Println("account.ignore[] = Orphan-EUR")
-		fmt.Println("account.ignore[] = Imbalance-EUR")
+		fmt.Printf("%s[] = Root Account\n", KIgnore)
+		fmt.Printf("%s[] = Opening Balances\n", KIgnore)
+		fmt.Printf("%s[] = Orphan-EUR\n", KIgnore)
+		fmt.Printf("%s[] = Imbalance-EUR\n", KIgnore)
+		fmt.Println()
+		fmt.Printf("%s[] = ^assets\\.current\\.wallets\\.me$\n", KReport)
+		fmt.Printf("%s[] = ^assets\\.current\\..*bank\n", KReport)
+		fmt.Printf("%s[]  = ^equity\\.opening balances$\n", KReportIgnore)
 		return nil
 	})
 
@@ -503,7 +530,7 @@ func main() {
 			}
 			_accounts := book.Accounts
 			accounts := make(gnucash.Accounts, 0, len(_accounts))
-			_, ignore, err := ignores(conf)
+			_, ignore, err := confPrefix(conf, KIgnore)
 			if err != nil {
 				return err
 			}
@@ -566,16 +593,7 @@ func main() {
 				vals = append(vals, item)
 			}
 
-			n := len(vals)
-			if n < cap(vals) {
-				vals = vals[:cap(vals)]
-			}
-			for i := n; i < len(vals); i++ {
-				if vals[i] != nil {
-					panic(i)
-				}
-				vals[i] = []interface{}{"", nil, nil}
-			}
+			vals = sheetPad(vals, 3)
 
 			values := &sheets.ValueRange{
 				MajorDimension: "ROWS",
@@ -666,7 +684,7 @@ func main() {
 					if dt == (time.Time{}) {
 						return fmt.Errorf("failed to parse date: %s", tx.date)
 					}
-					tx.date = dt.Format("2006-01-02")
+					tx.date = dt.Format(dFormat)
 
 					tx.from, err = strval(row, 3, true)
 					if err != nil {
@@ -843,6 +861,76 @@ func main() {
 		}
 		fmt.Fprintf(os.Stderr, "Generated %d rows\n", toImport)
 		fmt.Print(csvbuf.String())
+
+		err = func() error {
+			end := start("Updating report")
+			defer end()
+			accs, err := confPrefixArray(conf, KReport)
+			if err != nil {
+				return err
+			}
+			_ignores, err := confPrefixArray(conf, KReportIgnore)
+			if err != nil {
+				return err
+			}
+			ignores := make([]*regexp.Regexp, len(_ignores))
+			for i, ig := range _ignores {
+				ignores[i], err = regexp.Compile(ig)
+				if err != nil {
+					return err
+				}
+			}
+
+			regexes := make([]*regexp.Regexp, len(accs))
+			for i, acc := range accs {
+				regexes[i], err = regexp.Compile(acc)
+				if err != nil {
+					return err
+				}
+			}
+
+			now := time.Now()
+			cur := now.AddDate(-1, 0, 0)
+			cur = cur.AddDate(0, 0, -cur.Day()+1)
+			all := book.Transactions.Between(cur, now)
+
+			vals := make([][]interface{}, 1, 100)
+			vals[0] = make([]interface{}, 1+len(regexes))
+			vals[0][0] = "Date"
+			for i, acc := range accs {
+				vals[0][1+i] = acc
+			}
+
+			for ; cur.Before(now); cur = cur.AddDate(0, 1, 0) {
+				monthly := all.Between(cur, cur.AddDate(0, 1, 0))
+
+				entry := make([]interface{}, 1+len(regexes))
+				entry[0] = cur.Format(dFormat)
+				for i, re := range regexes {
+					l := monthly.Simplified().RelativeFrom(re).Filter(nil, nil, nil, re)
+					for _, ignore := range ignores {
+						l = l.Filter(nil, nil, nil, ignore)
+					}
+					entry[i+1] = -l.Sum()
+				}
+				vals = append(vals, entry)
+			}
+
+			vals = sheetPad(vals, len(accs)+2)
+
+			values := &sheets.ValueRange{
+				MajorDimension: "COLUMNS",
+				Values:         vals,
+			}
+			ur := srv.Spreadsheets.Values.Update(sid, "Report!A1", values)
+			ur.ValueInputOption("RAW")
+			_, err = ur.Do()
+			return err
+		}()
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 

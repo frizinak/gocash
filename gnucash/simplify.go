@@ -179,7 +179,7 @@ func (f FlatTransactions) RelativeTo(toFQN *regexp.Regexp) FlatTransactions {
 	return flattxs
 }
 
-func (f FlatTransactions) GroupBy(fromFQN *regexp.Regexp) FlatTransactions {
+func (f FlatTransactions) GroupBy() FlatTransactions {
 	m := make(map[string]int)
 	amount := 0
 	for i, t := range f {
