@@ -52,12 +52,12 @@ func (tx *transaction) GenID() error {
 	return nil
 }
 
-func (tx *transaction) Fields() [][]string {
+func (tx *transaction) Fields(n int) [][]string {
 	rows := make([][]string, 2)
 
 	rows[0], rows[1] = make([]string, 7), make([]string, 7)
 	rows[0][0] = tx.uid
-	rows[0][1] = tx.uid
+	rows[0][1] = fmt.Sprintf("hash%d-%s", n, tx.uid)
 	rows[0][2] = tx.date
 	rows[0][3] = tx.to
 	rows[0][4] = tx.amount
@@ -73,6 +73,15 @@ func (tx *transaction) Fields() [][]string {
 	rows[1][6] = ""
 
 	return rows
+}
+
+func num2uid(num string) (string, error) {
+	v := strings.SplitN(num, "-", 2)
+	if len(v) != 2 {
+		return v[0], fmt.Errorf("NUM '%s' can't be converted to a UID", num)
+	}
+	return v[1], nil
+
 }
 
 func start(msg string) func() {
@@ -450,7 +459,7 @@ func main() {
 		}
 
 		w := csv.NewWriter(os.Stdout)
-		for _, row := range tx.Fields() {
+		for _, row := range tx.Fields(0) {
 			if err := w.Write(row); err != nil {
 				return err
 			}
@@ -785,7 +794,12 @@ func main() {
 				if tx.Num == "" {
 					continue
 				}
-				txs := txsByUIDs[tx.Num]
+				uid, _ := num2uid(tx.Num)
+				if uid == "" {
+					continue
+				}
+
+				txs := txsByUIDs[uid]
 				for _, t := range txs {
 					t.state = "x"
 					found++
@@ -840,12 +854,14 @@ func main() {
 			if err := w.Write(row); err != nil {
 				return err
 			}
+			n := 0
 			for _, tx := range txs {
+				n++
 				if tx.state != "c" {
 					continue
 				}
 
-				rows := tx.Fields()
+				rows := tx.Fields(n)
 				for _, row := range rows {
 					toImport++
 					if err := w.Write(row); err != nil {
