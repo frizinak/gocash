@@ -539,10 +539,16 @@ func main() {
 			}
 			_accounts := book.Accounts
 			accounts := make(gnucash.Accounts, 0, len(_accounts))
-			_, ignore, err := confPrefix(conf, KIgnore)
+			_ignore, err := confPrefixArray(conf, KIgnore)
 			if err != nil {
 				return err
 			}
+
+			ignore := make(map[string]struct{}, len(_ignore))
+			for _, v := range _ignore {
+				ignore[v] = struct{}{}
+			}
+
 			for _, a := range _accounts {
 				if _, ok := ignore[a.FQN]; ok {
 					continue
