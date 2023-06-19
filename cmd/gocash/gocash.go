@@ -55,22 +55,21 @@ func (tx *transaction) GenID() error {
 func (tx *transaction) Fields(n int) [][]string {
 	rows := make([][]string, 2)
 
-	rows[0], rows[1] = make([]string, 7), make([]string, 7)
-	rows[0][0] = tx.uid
-	rows[0][1] = fmt.Sprintf("hash%d-%s", n, tx.uid)
-	rows[0][2] = tx.date
-	rows[0][3] = tx.to
-	rows[0][4] = tx.amount
-	rows[0][5] = "1"
-	rows[0][6] = tx.descr
+	num := fmt.Sprintf("hash%d-%s", n, tx.uid)
+	rows[0], rows[1] = make([]string, 6), make([]string, 6)
+	rows[0][0] = num
+	rows[0][1] = tx.date
+	rows[0][2] = tx.to
+	rows[0][3] = tx.amount
+	rows[0][4] = "1"
+	rows[0][5] = tx.descr
 
-	rows[1][0] = tx.uid
+	rows[1][0] = num
 	rows[1][1] = ""
-	rows[1][2] = ""
-	rows[1][3] = tx.from
-	rows[1][4] = "-" + tx.amount
-	rows[1][5] = "1"
-	rows[1][6] = ""
+	rows[1][2] = tx.from
+	rows[1][3] = "-" + tx.amount
+	rows[1][4] = "1"
+	rows[1][5] = ""
 
 	return rows
 }
@@ -849,7 +848,6 @@ func main() {
 			defer end()
 			w := csv.NewWriter(csvbuf)
 			row := []string{
-				"uid",
 				"num",
 				"date",
 				"account",
@@ -861,8 +859,12 @@ func main() {
 				return err
 			}
 			n := 0
+			lastUID := ""
 			for _, tx := range txs {
-				n++
+				if lastUID == "" || lastUID != tx.uid {
+					n++
+					lastUID = tx.uid
+				}
 				if tx.state != "c" {
 					continue
 				}
