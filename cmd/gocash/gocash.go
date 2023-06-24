@@ -32,6 +32,7 @@ type transaction struct {
 	to     string
 	amount string
 	descr  string
+	memo   string
 }
 
 func (tx *transaction) GenID() error {
@@ -56,20 +57,19 @@ func (tx *transaction) Fields(n int) [][]string {
 	rows := make([][]string, 2)
 
 	num := fmt.Sprintf("hash%d-%s", n, tx.uid)
-	rows[0], rows[1] = make([]string, 6), make([]string, 6)
+	rows[0], rows[1] = make([]string, 7), make([]string, 7)
 	rows[0][0] = num
 	rows[0][1] = tx.date
 	rows[0][2] = tx.to
 	rows[0][3] = tx.amount
 	rows[0][4] = "1"
 	rows[0][5] = tx.descr
+	rows[0][6] = tx.memo
 
 	rows[1][0] = num
-	rows[1][1] = ""
 	rows[1][2] = tx.from
 	rows[1][3] = "-" + tx.amount
 	rows[1][4] = "1"
-	rows[1][5] = ""
 
 	return rows
 }
@@ -630,7 +630,7 @@ func main() {
 		err = func() error {
 			end := start("Fetching transactions")
 			defer end()
-			readRange := "Tx!A2:G"
+			readRange := "Tx!A2:H"
 			resp, err := srv.Spreadsheets.Values.Get(sid, readRange).Do()
 			if err != nil {
 				return err
@@ -730,6 +730,11 @@ func main() {
 					}
 
 					tx.descr, err = strval(row, 6, true)
+					if err != nil {
+						return err
+					}
+
+					tx.memo, err = strval(row, 7, false)
 					if err != nil {
 						return err
 					}
