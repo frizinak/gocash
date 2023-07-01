@@ -24,13 +24,60 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+type group struct {
+	num     string
+	date    string
+	account string
+	amount  float64
+	descr   string
+	memo    string
+}
+
+func (g *group) Add(s *group) {
+	if g.num != s.num || g.account != s.account {
+		panic("HEY da mag niii")
+	}
+
+	g.amount += s.amount
+}
+
+func (g *group) Fields() []string {
+	return []string{
+		g.num,
+		g.date,
+		g.account,
+		fmt.Sprintf("%.2f", g.amount),
+		"1",
+		g.descr,
+		g.memo,
+	}
+	// rows := make([][]string, 2)
+
+	// num := fmt.Sprintf("hash%d-%s", n, tx.uid)
+	// rows[0], rows[1] = make([]string, 7), make([]string, 7)
+	// rows[0][0] = num
+	// rows[0][1] = tx.date
+	// rows[0][2] = tx.to
+	// rows[0][3] = tx.amount
+	// rows[0][4] = "1"
+	// rows[0][5] = tx.descr
+	// rows[0][6] = tx.memo
+
+	// rows[1][0] = num
+	// rows[1][2] = tx.from
+	// rows[1][3] = "-" + tx.amount
+	// rows[1][4] = "1"
+
+	// return rows
+}
+
 type transaction struct {
 	state  string
 	uid    string
 	date   string
 	from   string
 	to     string
-	amount string
+	amount float64
 	descr  string
 	memo   string
 }
@@ -53,26 +100,39 @@ func (tx *transaction) GenID() error {
 	return nil
 }
 
-func (tx *transaction) Fields(n int) [][]string {
-	rows := make([][]string, 2)
-
+func (tx *transaction) Groups(n int) (from, to *group) {
+	from, to = &group{}, &group{}
 	num := fmt.Sprintf("hash%d-%s", n, tx.uid)
-	rows[0], rows[1] = make([]string, 7), make([]string, 7)
-	rows[0][0] = num
-	rows[0][1] = tx.date
-	rows[0][2] = tx.to
-	rows[0][3] = tx.amount
-	rows[0][4] = "1"
-	rows[0][5] = tx.descr
-	rows[0][6] = tx.memo
 
-	rows[1][0] = num
-	rows[1][2] = tx.from
-	rows[1][3] = "-" + tx.amount
-	rows[1][4] = "1"
+	from.num = num
+	from.date = tx.date
+	from.account = tx.from
+	from.amount = -tx.amount
+	from.descr = ""
+	from.memo = ""
 
-	return rows
+	to.num = num
+	to.date = tx.date
+	to.account = tx.to
+	to.amount = tx.amount
+	to.descr = tx.descr
+	to.memo = tx.memo
+
+	return
 }
+
+type transactions []*transaction
+
+// func (txs transactions) Len() int      { return len(txs) }
+// func (txs transactions) Swap(i, j int) { txs[i], txs[j] = txs[j], txs[i] }
+// func (txs transactions) Less(i, j int) bool {
+// 	ti, tj := txs[i], txs[j]
+// 	if ti.date == tj.date {
+// 		return i < j
+// 	}
+//
+// 	return ti.date < tj.date
+// }
 
 func num2uid(num string) (string, error) {
 	v := strings.SplitN(num, "-", 2)
@@ -360,6 +420,8 @@ func main() {
 			h.Add("fuzzy find an account")
 		}
 	}).Handler(func(set *flags.Set, args []string) error {
+		fmt.Fprintln(os.Stderr, "command disabled for now")
+		os.Exit(0)
 		if len(args) == 0 {
 			return errors.New("please provide a query")
 		}
@@ -433,10 +495,15 @@ func main() {
 		// todo validation / completion
 		tx := &transaction{}
 		tx.date = time.Now().Format(dFormat)
-		tx.amount, err = ask("Amount", float)
+		amount, err := ask("Amount", float)
 		if err != nil {
 			return err
 		}
+		amountf, err := strconv.ParseFloat(amount, 64)
+		if err != nil {
+			return err
+		}
+		tx.amount = amountf
 
 		tx.descr, err = ask("Description", noop)
 		if err != nil {
@@ -458,8 +525,10 @@ func main() {
 		}
 
 		w := csv.NewWriter(os.Stdout)
-		for _, row := range tx.Fields(0) {
-			if err := w.Write(row); err != nil {
+		from, to := tx.Groups(0)
+		groups := []*group{to, from}
+		for _, group := range groups {
+			if err := w.Write(group.Fields()); err != nil {
 				return err
 			}
 		}
@@ -622,7 +691,7 @@ func main() {
 			return err
 		}
 
-		txs := make([]*transaction, 0)
+		txs := make(transactions, 0)
 		txsByUIDs := make(map[string][]*transaction)
 
 		errbuf := bytes.NewBuffer(nil)
@@ -720,11 +789,11 @@ func main() {
 					}
 					tx.to = rto
 
-					tx.amount, err = strval(row, 5, true)
+					amount, err := strval(row, 5, true)
 					if err != nil {
 						return err
 					}
-					_, err = strconv.ParseFloat(tx.amount, 32)
+					tx.amount, err = strconv.ParseFloat(amount, 64)
 					if err != nil {
 						return err
 					}
@@ -761,7 +830,7 @@ func main() {
 
 				all++
 				switch tx.state {
-				case "x":
+				case "x", "c":
 					old++
 				case "e":
 					bad++
@@ -846,6 +915,62 @@ func main() {
 			return err
 		}
 
+		groups := make([]*group, 0, len(txs)*2)
+		err = func() error {
+			n := 0
+			lastUID := ""
+			qualifies := func(tx *transaction) bool {
+				return tx.state == "c"
+			}
+			fromkey := func(g *group) string {
+				return fmt.Sprintf("%s|%s", g.num, g.account)
+			}
+
+			for i := 0; i < len(txs); i++ {
+				tx := txs[i]
+				if lastUID == "" || lastUID != tx.uid {
+					n++
+					lastUID = tx.uid
+				}
+				if !qualifies(tx) {
+					continue
+				}
+
+				from, to := tx.Groups(n)
+				groups = append(groups, to)
+				groupFrom := make(map[string]*group, len(txs))
+				groupFrom[fromkey(from)] = from
+
+				for j := i + 1; j < len(txs); j++ {
+					if !qualifies(txs[j]) {
+						continue
+					}
+					if tx.uid != txs[j].uid {
+						break
+					}
+
+					i = j
+					fromj, toj := txs[j].Groups(n)
+					groups = append(groups, toj)
+					k := fromkey(fromj)
+					if f, ok := groupFrom[k]; ok {
+						f.Add(fromj)
+						continue
+					}
+					groupFrom[fromkey(fromj)] = fromj
+				}
+
+				for _, g := range groupFrom {
+					groups = append(groups, g)
+				}
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return err
+		}
+
 		csvbuf := bytes.NewBuffer(nil)
 		toImport := 0
 		err = func() error {
@@ -863,23 +988,10 @@ func main() {
 			if err := w.Write(row); err != nil {
 				return err
 			}
-			n := 0
-			lastUID := ""
-			for _, tx := range txs {
-				if lastUID == "" || lastUID != tx.uid {
-					n++
-					lastUID = tx.uid
-				}
-				if tx.state != "c" {
-					continue
-				}
-
-				rows := tx.Fields(n)
-				for _, row := range rows {
-					toImport++
-					if err := w.Write(row); err != nil {
-						return err
-					}
+			for _, group := range groups {
+				toImport++
+				if err := w.Write(group.Fields()); err != nil {
+					return err
 				}
 			}
 			w.Flush()
